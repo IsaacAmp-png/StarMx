@@ -1,73 +1,95 @@
-
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
 // ==========================================================
 // 1. VARIABLES GLOBALES Y MENÚ
 // ==========================================================
 let juegoIniciado = false;
-let enemigosDerribados = 0;
+let puntos = 0;
 
 const menu = document.getElementById('menuInicio');
-const marcador = document.getElementById('marcador');
-const puntosTxt = document.getElementById('puntosTxt');
+const hud = document.getElementById('hud');
+const btnDispararUI = document.getElementById('btnDisparar');
+const scoreTxt = document.getElementById('score');
+const hitMarker = document.getElementById('hitMarker');
 
 document.getElementById('btnPlay').addEventListener('click', () => {
   menu.style.display = 'none';
-  marcador.style.display = 'block';
+  hud.style.display = 'block';
+  btnDispararUI.style.display = 'block';
   juegoIniciado = true;
-  console.log("¡Misión iniciada! Sistemas en línea.");
-});
-
-document.getElementById('btnSalir').addEventListener('click', () => {
-  alert("Transmisión terminada.");
-  window.location.reload();
 });
 
 // ==========================================================
 // 2. ESCENA, CÁMARA Y RENDERIZADOR
 // ==========================================================
 const scene = new THREE.Scene();
-// Niebla para dar ese look de N64 donde el fondo se desvanece
-scene.fog = new THREE.Fog(0x000000, 10, 60); 
+scene.fog = new THREE.Fog(0x444455, 10, 80); // Niebla grisácea/azulada como en N64
+scene.background = new THREE.Color(0x444455);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-// Elevamos la cámara y la hacemos ligeramente hacia atrás
 camera.position.set(0, 3, 10); 
 
-const renderer = new THREE.WebGLRenderer({ antialias: false }); // Antialias false = Look retro garantizado
+const renderer = new THREE.WebGLRenderer({ antialias: false });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// RELOJ PARA EL DELTA TIME
 const clock = new THREE.Clock();
 
 // ==========================================================
 // 3. LUCES
 // ==========================================================
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
 scene.add(ambientLight);
-
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
 directionalLight.position.set(5, 10, 5);
 scene.add(directionalLight);
 
 // ==========================================================
-// 4. JUGADOR (Nave Retro Triangular - Escuadrón MX)
+// 4. ENTORNO (Suelo, Camino y Edificios)
+// ==========================================================
+// Suelo verde principal
+const sueloGeo = new THREE.PlaneGeometry(300, 300);
+const sueloMat = new THREE.MeshStandardMaterial({ color: 0x004411, flatShading: true });
+const suelo = new THREE.Mesh(sueloGeo, sueloMat);
+suelo.rotation.x = -Math.PI / 2;
+suelo.position.y = -6;
+scene.add(suelo);
+
+// Pista/Ruta central (Azul/Grisácea)
+const pistaGeo = new THREE.PlaneGeometry(12, 300);
+const pistaMat = new THREE.MeshStandardMaterial({ color: 0x224466, flatShading: true });
+const pista = new THREE.Mesh(pistaGeo, pistaMat);
+pista.rotation.x = -Math.PI / 2;
+pista.position.y = -5.9; // Un poco arriba del suelo
+scene.add(pista);
+
+// Generación de edificios grises a los lados
+const edificios = [];
+const edificioGeo = new THREE.BoxGeometry(3, 15, 3);
+const edificioMat = new THREE.MeshStandardMaterial({ color: 0x888899, flatShading: true });
+
+for(let i = 0; i < 15; i++) {
+  const ed = new THREE.Mesh(edificioGeo, edificioMat);
+  // Posiciones aleatorias a la izquierda o derecha del camino
+  const lado = Math.random() > 0.5 ? 1 : -1;
+  ed.position.set(lado * (10 + Math.random() * 20), -2, -Math.random() * 100);
+  scene.add(ed);
+  edificios.push(ed);
+}
+
+// ==========================================================
+// 5. JUGADOR (Escuadrón MX - Nave Verde)
 // ==========================================================
 const jugador = new THREE.Group();
 
-// Fuselaje central (Cono)
-const cuerpoGeo = new THREE.ConeGeometry(0.6, 2.5, 4);
-const cuerpoMat = new THREE.MeshStandardMaterial({ color: 0x006847, flatShading: true }); // Verde México
+const cuerpoGeo = new THREE.ConeGeometry(0.8, 3, 4);
+const cuerpoMat = new THREE.MeshStandardMaterial({ color: 0x00ff00, flatShading: true }); // Verde brillante
 const cuerpo = new THREE.Mesh(cuerpoGeo, cuerpoMat);
 cuerpo.rotation.x = Math.PI / 2;
 jugador.add(cuerpo);
 
-// Alas triangulares
 const alasGeo = new THREE.BufferGeometry().setFromPoints([
-  new THREE.Vector3(-2, 0, 0), // Punta izquierda
-  new THREE.Vector3(2, 0, 0),  // Punta derecha
-  new THREE.Vector3(0, 0, -1.5) // Centro trasero
+  new THREE.Vector3(-2.5, 0, 0), new THREE.Vector3(2.5, 0, 0), new THREE.Vector3(0, 0, -1.5)
 ]);
 const alasMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, side: THREE.DoubleSide });
 const alas = new THREE.Mesh(alasGeo, alasMat);
@@ -76,31 +98,45 @@ jugador.add(alas);
 scene.add(jugador);
 
 // ==========================================================
-// 5. ENEMIGO (Nave USA - Enemigo genérico)
+// 6. ENEMIGOS (Escuadrón Rojo)
 // ==========================================================
-const obstaculoGeo = new THREE.ConeGeometry(1, 2, 4);
-const obstaculoMat = new THREE.MeshStandardMaterial({ color: 0x0033a0, flatShading: true }); // Azul
-const obstaculo = new THREE.Mesh(obstaculoGeo, obstaculoMat);
-obstaculo.rotation.x = -Math.PI / 2; // Apunta hacia nosotros
+const enemigos = [];
+const enemigoGeo = new THREE.ConeGeometry(1, 2.5, 4);
+const enemigoMat = new THREE.MeshStandardMaterial({ color: 0xff0000, flatShading: true }); // Rojo agresivo
 
-function reiniciarObstaculo() {
-  obstaculo.position.z = -60; // Lo mandamos muy al fondo
-  obstaculo.position.x = (Math.random() - 0.5) * 30; // Rango X aleatorio
-  obstaculo.position.y = (Math.random() - 0.5) * 10; // Rango Y aleatorio
+function crearEnemigo() {
+  const enemigo = new THREE.Mesh(enemigoGeo, enemigoMat);
+  enemigo.rotation.x = -Math.PI / 2;
+  enemigo.position.set((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 10, -80);
+  scene.add(enemigo);
+  enemigos.push(enemigo);
 }
-reiniciarObstaculo();
-scene.add(obstaculo);
+// Creamos 3 enemigos iniciales
+for(let i=0; i<3; i++) crearEnemigo();
 
 // ==========================================================
-// 6. ENTORNO (Suelo Retro estilo cuadrícula)
+// 7. SISTEMA DE DISPARO (Lásers)
 // ==========================================================
-// Esto ayuda muchísimo a dar la sensación de velocidad
-const rejilla = new THREE.GridHelper(200, 100, 0x00ff00, 0x004400);
-rejilla.position.y = -5;
-scene.add(rejilla);
+const lasers = [];
+const laserGeo = new THREE.CylinderGeometry(0.1, 0.1, 2, 8);
+const laserMat = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Láser color cyan (N64 clásico)
+
+function disparar() {
+  if (!juegoIniciado) return;
+  const laser = new THREE.Mesh(laserGeo, laserMat);
+  laser.rotation.x = Math.PI / 2;
+  // El láser sale de la posición actual de nuestra nave
+  laser.position.copy(jugador.position); 
+  scene.add(laser);
+  lasers.push(laser);
+}
+
+// Escuchamos el botón en pantalla y la barra espaciadora
+btnDispararUI.addEventListener('touchstart', (e) => { e.preventDefault(); disparar(); });
+btnDispararUI.addEventListener('mousedown', disparar);
 
 // ==========================================================
-// 7. CONTROLES
+// 8. CONTROLES Y TECLADO
 // ==========================================================
 const teclas = { w: false, a: false, s: false, d: false };
 
@@ -109,8 +145,8 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'd' || e.key === 'D') teclas.d = true;
   if (e.key === 'w' || e.key === 'W') teclas.w = true;
   if (e.key === 's' || e.key === 'S') teclas.s = true;
+  if (e.key === ' ') disparar(); // Disparar con espacio
 });
-
 window.addEventListener('keyup', (e) => {
   if (e.key === 'a' || e.key === 'A') teclas.a = false;
   if (e.key === 'd' || e.key === 'D') teclas.d = false;
@@ -119,68 +155,83 @@ window.addEventListener('keyup', (e) => {
 });
 
 // ==========================================================
-// 8. BUCLE DE ANIMACIÓN (Game Loop)
+// 9. BUCLE DE ANIMACIÓN (Game Loop)
 // ==========================================================
-const velJugador = 15.0;
-const velObstaculo = 40.0;
+const velJugador = 18.0;
+const velMundo = 50.0;
+const velLaser = 80.0;
 
 function animate() {
   requestAnimationFrame(animate);
-
-  if (!juegoIniciado) {
-    renderer.render(scene, camera);
-    return;
-  }
+  if (!juegoIniciado) { renderer.render(scene, camera); return; }
 
   const deltaTime = clock.getDelta();
 
-  // Movimiento del jugador con límites de pantalla
+  // Movimiento del jugador
   if (teclas.a && jugador.position.x > -12) jugador.position.x -= velJugador * deltaTime;
   if (teclas.d && jugador.position.x < 12)  jugador.position.x += velJugador * deltaTime;
   if (teclas.w && jugador.position.y < 8)   jugador.position.y += velJugador * deltaTime;
   if (teclas.s && jugador.position.y > -3)  jugador.position.y -= velJugador * deltaTime;
-
-  // ¡TRUCO RETRO! Inclinamos la nave visualmente al moverse a los lados
   jugador.rotation.z = -jugador.position.x * 0.05;
 
-  // Animación del entorno (Movemos la rejilla hacia nosotros para simular velocidad)
-  rejilla.position.z += velObstaculo * deltaTime;
-  if (rejilla.position.z > 2) {
-    rejilla.position.z = 0; // Se resetea suavemente
+  // Animación del entorno (Movemos los edificios hacia nosotros)
+  for (let i = 0; i < edificios.length; i++) {
+    edificios[i].position.z += velMundo * deltaTime;
+    // Si el edificio pasa la cámara, lo mandamos al fondo de nuevo
+    if (edificios[i].position.z > camera.position.z) {
+      edificios[i].position.z = -100;
+      edificios[i].position.x = (Math.random() > 0.5 ? 1 : -1) * (10 + Math.random() * 20);
+    }
   }
 
-  // Animación del enemigo
-  obstaculo.position.z += velObstaculo * deltaTime;
-
-  // Colisión (Jugador vs Obstáculo)
-  const distancia = jugador.position.distanceTo(obstaculo.position);
-  if (distancia < 2.5) {
-    console.error("¡Impacto!");
-    // Reseteamos el marcador al chocar
-    enemigosDerribados = 0;
-    puntosTxt.innerText = enemigosDerribados;
-    reiniciarObstaculo();
-    // Opcional: Podría agregar un efecto rojo a la pantalla aquí
+  // Mover enemigos hacia nosotros
+  for (let i = 0; i < enemigos.length; i++) {
+    enemigos[i].position.z += (velMundo * 0.6) * deltaTime;
+    if (enemigos[i].position.z > camera.position.z) {
+      enemigos[i].position.set((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 10, -80);
+    }
   }
 
-  // Esquivado / Pasó de largo (Simulamos que le ganamos o lo esquivamos)
-  if (obstaculo.position.z > camera.position.z) {
-    enemigosDerribados++;
-    puntosTxt.innerText = enemigosDerribados;
-    reiniciarObstaculo();
+  // Mover lásers y checar colisiones
+  for (let i = lasers.length - 1; i >= 0; i--) {
+    lasers[i].position.z -= velLaser * deltaTime;
+
+    // Checar si el láser le dio a algún enemigo
+    for (let j = 0; j < enemigos.length; j++) {
+      if (lasers[i] && lasers[i].position.distanceTo(enemigos[j].position) < 2.5) {
+        // ¡Impacto!
+        enemigos[j].position.set((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 10, -80); // Resetea enemigo
+        
+        // Destruir láser
+        scene.remove(lasers[i]);
+        lasers.splice(i, 1);
+        
+        // Actualizar HUD
+        puntos += 10;
+        // Rellenar con ceros (ej. 010, 020)
+        scoreTxt.innerText = puntos.toString().padStart(3, '0');
+        
+        // Mostrar texto en pantalla rápido
+        hitMarker.style.display = 'block';
+        setTimeout(() => { hitMarker.style.display = 'none'; }, 200);
+        break; // Rompe el ciclo del enemigo para este láser
+      }
+    }
+
+    // Borrar lásers que se fueron muy lejos para no saturar la memoria
+    if (lasers[i] && lasers[i].position.z < -100) {
+      scene.remove(lasers[i]);
+      lasers.splice(i, 1);
+    }
   }
 
   renderer.render(scene, camera);
 }
-
 animate();
 
-// ==========================================================
-// 9. AJUSTE DE PANTALLA
-// ==========================================================
+// Ajuste de pantalla
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
-  
