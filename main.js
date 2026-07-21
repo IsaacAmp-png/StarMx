@@ -15,7 +15,6 @@ const sfxShuts = [
   new Audio('soniditos/shut 1.mp3'), new Audio('soniditos/shut 1(1).mp3'), new Audio('soniditos/Shut 1(2).mp3')
 ];
 
-// Arreglo de muertes (Enemigos explotando o tú muriendo)
 const sfxMuertes = [
   new Audio('soniditos/muerte.mp3'), new Audio('soniditos/muerte2.mp3'), new Audio('soniditos/muerte3.mp3')
 ];
@@ -32,9 +31,9 @@ function playRandom(arr) {
 // 2. VARIABLES GLOBALES Y UI
 // ==========================================================
 let juegoIniciado = false;
-let puntos = 0, salud = 100, vidas = 3;
+let puntos = 0, salud = 100; // ¡Cero vidas extra! Si salud llega a 0, Game Over.
 let tiempoSupervivencia = 0, tiempoUltimoEnemigo = 0; 
-let mouse = new THREE.Vector2(); // Para rastrear el apuntado
+let mouse = new THREE.Vector2(); 
 
 const menuInicio = document.getElementById('menuInicio');
 const crawlContainer = document.getElementById('crawlContainer');
@@ -43,7 +42,6 @@ const menuGameOver = document.getElementById('menuGameOver');
 const hud = document.getElementById('hud');
 const scoreTxt = document.getElementById('score');
 const healthBar = document.getElementById('healthBar');
-const vidasTxt = document.getElementById('lives');
 const tiempoUI = document.getElementById('tiempoUI');
 const crosshair = document.getElementById('crosshair');
 
@@ -59,8 +57,6 @@ document.getElementById('btnComenzar').addEventListener('click', () => {
   menuInicio.style.display = 'none';
   crawlContainer.style.display = 'block';
   song.play();
-  
-  // La historia dura 15 segundos, luego pasa al Briefing
   window.historiaTimer = setTimeout(iniciarBriefing, 14000);
 });
 
@@ -73,15 +69,11 @@ document.getElementById('btnOmitir').addEventListener('click', () => {
 function iniciarBriefing() {
   crawlContainer.style.display = 'none';
   briefingScreen.style.display = 'flex';
-  
-  // Pantalla de misión por 3.5 segundos
   setTimeout(() => {
     briefingScreen.style.display = 'none';
     hud.style.display = 'block';
     document.body.style.cursor = 'none'; 
     juegoIniciado = true;
-    
-    // Spawn inicial agresivo (Más enemigos al empezar)
     for(let i=0; i<6; i++) spawnEnemigo();
   }, 3500);
 }
@@ -148,7 +140,6 @@ function spawnEnemigo() {
   enemigo.rotation.x = -Math.PI / 2;
   enemigo.position.set((Math.random() - 0.5) * 25, (Math.random() - 0.5) * 12, -90);
   enemigo.castShadow = true;
-  // Añadimos una semilla única a cada enemigo para que su movimiento sea diferente
   enemigo.userData.seed = Math.random() * 100;
   scene.add(enemigo); enemigos.push(enemigo);
 }
@@ -159,7 +150,7 @@ function spawnEnemigo() {
 const lasersJugador = [];
 const lasersEnemigos = [];
 const laserMXGeo = new THREE.CylinderGeometry(0.15, 0.15, 3, 8); 
-laserMXGeo.rotateX(Math.PI / 2); // Vital para que lookAt funcione
+laserMXGeo.rotateX(Math.PI / 2); 
 const laserMXMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); 
 const laserUSAGeo = new THREE.CylinderGeometry(0.15, 0.15, 3, 8); 
 laserUSAGeo.rotateX(Math.PI / 2);
@@ -172,13 +163,11 @@ window.addEventListener('mousedown', () => {
   const laser = new THREE.Mesh(laserMXGeo, laserMXMat);
   laser.position.copy(jugador.position); 
   
-  // MAGIA DEL APUNTADO: Convertimos el 2D del mouse a 3D
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(mouse, camera);
   const targetPoint = new THREE.Vector3();
-  raycaster.ray.at(100, targetPoint); // Proyectamos un punto a 100 metros de distancia
+  raycaster.ray.at(100, targetPoint); 
   
-  // Apuntamos el láser hacia ese punto y calculamos su dirección
   laser.lookAt(targetPoint);
   laser.userData.velocidad = new THREE.Vector3().subVectors(targetPoint, jugador.position).normalize();
   
@@ -188,7 +177,6 @@ window.addEventListener('mousedown', () => {
 function dispararEnemigo(naveEnemiga) {
   const laser = new THREE.Mesh(laserUSAGeo, laserUSAMat);
   laser.position.copy(naveEnemiga.position);
-  // El enemigo te apunta directo a ti
   laser.lookAt(jugador.position);
   laser.userData.velocidad = new THREE.Vector3().subVectors(jugador.position, naveEnemiga.position).normalize();
   scene.add(laser); lasersEnemigos.push(laser);
@@ -214,58 +202,56 @@ window.addEventListener('keyup', (e) => {
 window.addEventListener('mousemove', (e) => {
   if (juegoIniciado) { 
     crosshair.style.left = e.clientX + 'px'; crosshair.style.top = e.clientY + 'px'; 
-    // Normalizamos posición para el Raycaster (-1 a +1)
     mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   }
 });
 
 // ==========================================================
-// 9. DAÑO Y SISTEMA DE MEDALLAS
+// 9. LOGICA DE FIN DE JUEGO Y DAÑO
 // ==========================================================
+function finalizarJuego(victoria) {
+  juegoIniciado = false;
+  song.pause(); 
+  sfxMove.pause(); 
+  document.body.style.cursor = 'default'; 
+  
+  const titulo = document.getElementById('tituloFinal');
+  const medalla = document.getElementById('medallaTxt');
+  document.getElementById('puntosFinalesTxt').innerText = "Puntos obtenidos: " + puntos;
+  
+  if (victoria) {
+    playSfx(sfxAceptar); 
+    titulo.innerText = "¡MISIÓN CUMPLIDA!"; titulo.style.color = "#00ff00";
+    if (puntos >= 6000) {
+      medalla.innerText = "🥇 MEDALLA DE ORO"; medalla.style.color = "#ffd700";
+    } else if (puntos >= 4000) {
+      medalla.innerText = "🥈 MEDALLA DE PLATA"; medalla.style.color = "#c0c0c0";
+    } else {
+      medalla.innerText = "🥉 MEDALLA DE BRONCE"; medalla.style.color = "#cd7f32";
+    }
+  } else {
+    // DERROTA
+    playRandom(sfxMuertes); // Sonido de explosión
+    setTimeout(() => playSfx(sfxPerdiste), 800); // Música triste un momento después
+    titulo.innerText = "M.I.A. (MISSING IN ACTION)"; titulo.style.color = "red";
+    medalla.innerText = "Misión Fallida"; medalla.style.color = "#888";
+  }
+  
+  menuGameOver.style.display = 'flex'; 
+}
+
 function recibirDano() {
   if (!juegoIniciado) return;
-  salud -= 15; healthBar.style.width = salud + '%';
+  salud -= 15; 
+  healthBar.style.width = Math.max(0, salud) + '%';
   document.getElementById('damageOverlay').style.display = 'block';
   setTimeout(() => { document.getElementById('damageOverlay').style.display = 'none'; }, 150);
 
   if (salud <= 0) {
-    vidas--; vidasTxt.innerText = "▲ x " + vidas;
-    salud = 100; healthBar.style.width = '100%';
-    
-    if (vidas < 0) {
-      juegoIniciado = false;
-      song.pause(); sfxMove.pause(); 
-      playRandom(sfxMuertes); // Muerte de tu nave
-      playSfx(sfxPerdiste);
-      document.body.style.cursor = 'default'; 
-      
-      const titulo = document.getElementById('tituloFinal');
-      const medalla = document.getElementById('medallaTxt');
-      
-      document.getElementById('puntosFinalesTxt').innerText = "Puntos obtenidos: " + puntos;
-      
-      // LOGICA DE MEDALLAS
-      if (puntos >= 3000) {
-        titulo.innerText = "¡MISIÓN CUMPLIDA!"; titulo.style.color = "#00ff00";
-        medalla.innerText = "🥇 MEDALLA DE ORO"; medalla.style.color = "#ffd700";
-      } else if (puntos >= 2000) {
-        titulo.innerText = "¡MISIÓN CUMPLIDA!"; titulo.style.color = "#00ff00";
-        medalla.innerText = "🥈 MEDALLA DE PLATA"; medalla.style.color = "#c0c0c0";
-      } else if (puntos >= 1000) {
-        titulo.innerText = "¡MISIÓN CUMPLIDA!"; titulo.style.color = "#00ff00";
-        medalla.innerText = "🥉 MEDALLA DE BRONCE"; medalla.style.color = "#cd7f32";
-      } else {
-        titulo.innerText = "M.I.A. (MISSING IN ACTION)"; titulo.style.color = "red";
-        medalla.innerText = "Sin medalla"; medalla.style.color = "#888";
-      }
-      
-      menuGameOver.style.display = 'flex'; 
-    } else {
-      playSfx(sfxDano); // Daño pero sigues vivo
-    }
+    finalizarJuego(false); // Pierde por morir
   } else {
-    playSfx(sfxDano); // Impacto recibido
+    playSfx(sfxDano); // Suena "DañoRecibido.mp3" solo si seguimos vivos
   }
 }
 
@@ -282,6 +268,12 @@ function animate() {
   const deltaTime = clock.getDelta();
   tiempoSupervivencia += deltaTime;
 
+  // VERIFICAR CONDICIONES DE VICTORIA (3 Minutos o 6000 puntos)
+  if (tiempoSupervivencia >= 180 || puntos >= 6000) {
+    finalizarJuego(true);
+    return;
+  }
+
   const enMovimiento = teclas.w || teclas.a || teclas.s || teclas.d;
   if (enMovimiento && sfxMove.paused) sfxMove.play().catch(()=>{});
   else if (!enMovimiento && !sfxMove.paused) sfxMove.pause();
@@ -289,7 +281,6 @@ function animate() {
   const min = Math.floor(tiempoSupervivencia / 60), sec = Math.floor(tiempoSupervivencia % 60);
   tiempoUI.innerText = `Tiempo: ${min}:${sec.toString().padStart(2, '0')}`;
 
-  // Dificultad ajustada para más enemigos
   let frecuenciaSpawn = 2.0, probDisparoEnemigo = 0.005; 
   if (tiempoSupervivencia > 30) { frecuenciaSpawn = 1.0; } 
   if (tiempoSupervivencia > 90) { frecuenciaSpawn = 0.6; probDisparoEnemigo = 0.01; velMundo = 40.0; }
@@ -297,14 +288,12 @@ function animate() {
 
   if (tiempoSupervivencia - tiempoUltimoEnemigo > frecuenciaSpawn) { spawnEnemigo(); tiempoUltimoEnemigo = tiempoSupervivencia; }
 
-  // Física Jugador
   if (teclas.a && jugador.position.x > -12) jugador.position.x -= velJugador * deltaTime;
   if (teclas.d && jugador.position.x < 12)  jugador.position.x += velJugador * deltaTime;
   if (teclas.w && jugador.position.y < 8)   jugador.position.y += velJugador * deltaTime;
   if (teclas.s && jugador.position.y > -3)  jugador.position.y -= velJugador * deltaTime;
   jugador.rotation.z = -jugador.position.x * 0.05;
 
-  // Física Edificios
   for (let i = 0; i < edificios.length; i++) {
     edificios[i].position.z += velMundo * deltaTime;
     if (edificios[i].position.z > camera.position.z) {
@@ -313,18 +302,14 @@ function animate() {
     }
   }
 
-  // Física Enemigos (Con Evasión)
   for (let i = enemigos.length - 1; i >= 0; i--) {
     enemigos[i].position.z += (velMundo * 0.6) * deltaTime;
-    
-    // IA DE MOVIMIENTO EVASIVO: Oscilación suave usando seno y su semilla única
     enemigos[i].position.x += Math.sin(tiempoSupervivencia * 2 + enemigos[i].userData.seed) * 3.0 * deltaTime;
     
     if (Math.random() < probDisparoEnemigo && enemigos[i].position.z < 0) dispararEnemigo(enemigos[i]);
     if (enemigos[i].position.z > camera.position.z) { scene.remove(enemigos[i]); enemigos.splice(i, 1); }
   }
 
-  // Lásers Jugador (Viajan en la dirección calculada)
   for (let i = lasersJugador.length - 1; i >= 0; i--) {
     lasersJugador[i].position.add(lasersJugador[i].userData.velocidad.clone().multiplyScalar(velLaserMX * deltaTime));
     
@@ -332,9 +317,9 @@ function animate() {
       if (lasersJugador[i] && lasersJugador[i].position.distanceTo(enemigos[j].position) < 3.0) {
         scene.remove(enemigos[j]); enemigos.splice(j, 1); 
         scene.remove(lasersJugador[i]); lasersJugador.splice(i, 1); 
-        puntos += 50; // Más puntos por nave para alcanzar los 3000
+        puntos += 50; 
         scoreTxt.innerText = puntos.toString().padStart(4, '0');
-        playRandom(sfxMuertes); // Sonido de explosión enemiga
+        playRandom(sfxMuertes); 
         document.getElementById('hitMarker').style.display = 'block'; setTimeout(() => { document.getElementById('hitMarker').style.display = 'none'; }, 100);
         break; 
       }
@@ -342,7 +327,6 @@ function animate() {
     if (lasersJugador[i] && (lasersJugador[i].position.z < -120 || Math.abs(lasersJugador[i].position.x) > 50)) { scene.remove(lasersJugador[i]); lasersJugador.splice(i, 1); }
   }
 
-  // Lásers Enemigos
   for (let i = lasersEnemigos.length - 1; i >= 0; i--) {
     lasersEnemigos[i].position.add(lasersEnemigos[i].userData.velocidad.clone().multiplyScalar(velLaserUSA * deltaTime));
     if (lasersEnemigos[i].position.distanceTo(jugador.position) < 2.0) {
