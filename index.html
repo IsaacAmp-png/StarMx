@@ -59,8 +59,7 @@
     #healthBar { width: 100%; height: 100%; background: linear-gradient(to right, #ff4500, #ffd700, #4169e1); transition: width 0.3s ease; }
     #score { font-size: 2.5rem; color: #87ceeb; font-weight: bold; text-shadow: 2px 2px 0px #000; }
     #hudRight { position: absolute; top: 20px; right: 20px; text-align: right; }
-    #lives { font-size: 1.5rem; color: white; text-shadow: 2px 2px 0px #000; margin-bottom: 5px; }
-    #tiempoUI { font-size: 1.2rem; color: #ffeb3b; text-shadow: 2px 2px 0px #000;}
+    #tiempoUI { font-size: 1.5rem; color: #ffeb3b; text-shadow: 2px 2px 0px #000;}
 
     #crosshair { position: fixed; top: 50%; left: 50%; width: 50px; height: 50px; border: 3px solid rgba(0, 255, 0, 0.9); transform: translate(-50%, -50%); pointer-events: none; }
     #hitMarker { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: red; font-size: 2rem; font-weight: bold; display: none; text-shadow: 2px 2px #000; }
@@ -110,7 +109,7 @@
       <div id="score">000</div>
     </div>
     <div id="hudRight">
-      <div id="lives" id="vidasTxt">▲ x 3</div>
+      <!-- El contador de vidas fue removido para hacer el juego más hardcore (1 sola vida) -->
       <div id="tiempoUI">Tiempo: 0:00</div>
     </div>
     <div id="crosshair"></div>
